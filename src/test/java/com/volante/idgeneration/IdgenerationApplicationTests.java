@@ -1,0 +1,13 @@
+package com.volante.idgeneration;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class IdgenerationApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
