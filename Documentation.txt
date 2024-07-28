@@ -1,0 +1,15 @@
+sample payload:
+
+{
+  "type": "volpay",
+  "name": "Credittransfertrace"
+}
+
+
+
+sample payload 2:
+{
+  "type": "volpay",
+  "name": "interface"
+}
+
