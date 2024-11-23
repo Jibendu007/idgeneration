@@ -6,20 +6,21 @@ import com.volante.idgeneration.model.UniqueId;
 import com.volante.idgeneration.repository.PayloadRepository;
 import com.volante.idgeneration.repository.UniqueIdRepository;
 import com.volante.idgeneration.util.IDGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 
-import static com.volante.idgeneration.util.IDGenerator.WORKER_ID_BITS;
-
-
 @Service
 public class SnowflakeIdGenerationServiceImpl implements IdGenerationService {
+    private static final Logger logger = LoggerFactory.getLogger(SnowflakeIdGenerationServiceImpl.class);
 
     @Autowired
-    private PayloadRepository payloadRepository;// Autowire dependencies
+    private PayloadRepository payloadRepository;
+
     @Autowired
     private VolpayCounterService volpayCounterService;
 
@@ -31,43 +32,37 @@ public class SnowflakeIdGenerationServiceImpl implements IdGenerationService {
 
     private final IDGenerator idGenerator;
 
-    @Value("${workerId}") // Inject from application property
-    private long workerId;  // Change type to long
+    @Value("${workerId}")
+    private long workerId;
 
     public SnowflakeIdGenerationServiceImpl(IDGenerator idGenerator) {
         this.idGenerator = idGenerator;
-        // Validate workerId within allowed range in the constructor
-        if (workerId > (1L << WORKER_ID_BITS) - 1L) {
-            throw new IllegalArgumentException("Worker ID is larger than allowed range");
-        }
-        idGenerator.setWorkerId(workerId); // Set worker ID in the generator
+        logger.info("Initialized SnowflakeIdGenerationServiceImpl with worker ID: {}", workerId);
     }
 
+    @Override
     public String generateId(String payloadJson) throws IOException {
-        long id = idGenerator.generateID(); // Call without argument
-        String hashedId = String.valueOf(id);
-        String type = objectMapper.readValue(payloadJson, Payload.class).getType(); // Extract type from payload
-        long counter = volpayCounterService.getCounter(type); // Get counter for the type
-        String volpayid = type + "_" + counter; // Construct volpayid
-        Payload payload = objectMapper.readValue(payloadJson, Payload.class);
+        logger.debug("Generating ID for payload: {}", payloadJson);
 
-        uniqueIdRepository.save(new UniqueId(hashedId, volpayid)); // Store UniqueId with snowflake and volpayid
+        long id = idGenerator.generateID();
+        String hashedId = String.valueOf(id);
+
+        Payload payload = objectMapper.readValue(payloadJson, Payload.class);
+        String type = payload.getType();
+
+        logger.debug("Extracted type from payload: {}", type);
+
+        long counter = volpayCounterService.getCounter(type);
+        String volpayid = type + "_" + counter;
+
+        logger.info("Generated volpay ID: {} for type: {}", volpayid, type);
+
+        uniqueIdRepository.save(new UniqueId(hashedId, volpayid));
         payloadRepository.save(payload);
+
+        logger.info("Saved ID and payload to repositories. Snowflake ID: {}, Volpay ID: {}",
+                hashedId, volpayid);
 
         return hashedId;
     }
-
-
-    private String convertIdToString(Object id) {
-        if (id instanceof Long) {
-            return String.valueOf((Long) id);
-        } else if (id instanceof String) {
-            return (String) id;
-        } else {
-            // Handle unexpected return type (throw exception or log error)
-            throw new RuntimeException("Unexpected ID type from Snowflake: " + id.getClass());
-        }
-    }
 }
-
-
